@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Download, FileText, Loader2, Plus, X, ChevronDown, ChevronUp,
-  Sparkles, Edit3, AlertCircle, FilePlus, RotateCcw, Check
+  Edit3, FilePlus, RotateCcw, Check
 } from 'lucide-react';
 
 /* ============================================================
@@ -1529,156 +1529,38 @@ function PasswordGate({ children }) {
     }
   };
 
-  const handleKey = (e) => {
-    if (e.key === 'Enter') handleUnlock();
-  };
+  const handleKey = (e) => { if (e.key === 'Enter') handleUnlock(); };
 
   if (unlocked) return children;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#FAF7F0',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      padding: '1.5rem',
-    }}>
+    <div style={{ minHeight:'100vh', background:'#FAF7F0', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Inter, system-ui, sans-serif', padding:'1.5rem' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap');
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-8px); }
-          40% { transform: translateX(8px); }
-          60% { transform: translateX(-6px); }
-          80% { transform: translateX(6px); }
-        }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
         .gate-shake { animation: shake 0.45s ease; }
-        .gate-input:focus { outline: none; border-color: #1c1917 !important; box-shadow: 0 0 0 1px #1c1917; }
-        .gate-btn:hover { background: #44403c !important; }
+        .gate-input:focus { outline:none; border-color:#1c1917 !important; box-shadow:0 0 0 1px #1c1917; }
+        .gate-btn:hover { background:#44403c !important; }
       `}</style>
-
-      <div style={{
-        background: '#fff',
-        border: '1px solid #e7e5e4',
-        borderRadius: '0.5rem',
-        padding: '2.5rem 2rem',
-        width: '100%',
-        maxWidth: '22rem',
-        boxShadow: '0 4px 24px -4px rgba(0,0,0,0.08)',
-        textAlign: 'center',
-      }}>
-        {/* Logo / title */}
-        <div style={{
-          fontFamily: '"EB Garamond", Garamond, serif',
-          fontSize: '2rem',
-          fontWeight: 400,
-          fontStyle: 'italic',
-          color: '#1c1917',
-          marginBottom: '0.25rem',
-          letterSpacing: '0.01em',
-        }}>
-          Résumé
+      <div style={{ background:'#fff', border:'1px solid #e7e5e4', borderRadius:'0.5rem', padding:'2.5rem 2rem', width:'100%', maxWidth:'22rem', boxShadow:'0 4px 24px -4px rgba(0,0,0,0.08)', textAlign:'center' }}>
+        <div style={{ fontFamily:'"EB Garamond", Garamond, serif', fontSize:'2rem', fontWeight:400, fontStyle:'italic', color:'#1c1917', marginBottom:'0.25rem' }}>Résumé</div>
+        <div style={{ fontSize:'0.7rem', letterSpacing:'0.25em', textTransform:'uppercase', color:'#a8a29e', marginBottom:'2rem' }}>Builder</div>
+        <p style={{ fontSize:'0.875rem', color:'#57534e', marginBottom:'1.5rem', lineHeight:1.6 }}>Enter your access password to continue.</p>
+        <div className={shake ? 'gate-shake' : ''} style={{ marginBottom:'0.75rem' }}>
+          <input className="gate-input" type="password" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey} placeholder="Password" autoFocus
+            style={{ width:'100%', padding:'0.625rem 0.875rem', fontSize:'0.875rem', border: error ? '1px solid #dc2626' : '1px solid #d6d3d1', borderRadius:'0.25rem', background: error ? '#fef2f2' : '#fff', color:'#1c1c1c', fontFamily:'inherit', boxSizing:'border-box' }} />
         </div>
-        <div style={{
-          fontSize: '0.7rem',
-          letterSpacing: '0.25em',
-          textTransform: 'uppercase',
-          color: '#a8a29e',
-          marginBottom: '2rem',
-        }}>
-          Builder
-        </div>
-
-        <p style={{
-          fontSize: '0.875rem',
-          color: '#57534e',
-          marginBottom: '1.5rem',
-          lineHeight: 1.6,
-        }}>
-          Enter your access password to continue.
-        </p>
-
-        {/* Input */}
-        <div className={shake ? 'gate-shake' : ''} style={{ marginBottom: '0.75rem' }}>
-          <input
-            className="gate-input"
-            type="password"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder="Password"
-            autoFocus
-            style={{
-              width: '100%',
-              padding: '0.625rem 0.875rem',
-              fontSize: '0.875rem',
-              border: error ? '1px solid #dc2626' : '1px solid #d6d3d1',
-              borderRadius: '0.25rem',
-              background: error ? '#fef2f2' : '#fff',
-              color: '#1c1c1c',
-              fontFamily: 'inherit',
-              boxSizing: 'border-box',
-              transition: 'border-color 150ms',
-            }}
-          />
-        </div>
-
-        {/* Error message */}
-        <div style={{
-          fontSize: '0.8rem',
-          color: '#dc2626',
-          marginBottom: '1rem',
-          minHeight: '1.2rem',
-          transition: 'opacity 150ms',
-          opacity: error ? 1 : 0,
-        }}>
-          Incorrect password — please try again.
-        </div>
-
-        {/* Button */}
-        <button
-          className="gate-btn"
-          onClick={handleUnlock}
-          style={{
-            width: '100%',
-            padding: '0.625rem 1rem',
-            background: '#1c1917',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '0.25rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            letterSpacing: '0.02em',
-            transition: 'background 150ms',
-          }}
-        >
-          Enter
-        </button>
-
-        <p style={{
-          fontSize: '0.72rem',
-          color: '#a8a29e',
-          marginTop: '1.5rem',
-          lineHeight: 1.5,
-        }}>
-          Password included in your purchase receipt.
-        </p>
+        <div style={{ fontSize:'0.8rem', color:'#dc2626', marginBottom:'1rem', minHeight:'1.2rem', opacity: error ? 1 : 0 }}>Incorrect password — please try again.</div>
+        <button className="gate-btn" onClick={handleUnlock} style={{ width:'100%', padding:'0.625rem 1rem', background:'#1c1917', color:'#fff', border:'none', borderRadius:'0.25rem', fontSize:'0.875rem', fontWeight:500, cursor:'pointer', fontFamily:'inherit', transition:'background 150ms' }}>Enter</button>
+        <p style={{ fontSize:'0.72rem', color:'#a8a29e', marginTop:'1.5rem', lineHeight:1.5 }}>Password included in your purchase receipt.</p>
       </div>
     </div>
   );
 }
 
 function ResumeGeneratorInner() {
-  const [step, setStep] = useState('empty'); // 'empty' | 'parsing' | 'edit'
-  const [rawText, setRawText] = useState('');
   const [data, setData] = useState(EMPTY_RESUME);
   const [selectedTemplate, setSelectedTemplate] = useState('corporate-boardroom');
   const [activeCategory, setActiveCategory] = useState('corporate');
-  const [parseError, setParseError] = useState(null);
   // Per-template color overrides: { [templateId]: { accent, accent2 } }
   const [accentOverrides, setAccentOverrides] = useState({});
   const [isExporting, setIsExporting] = useState(null); // 'pdf' | 'docx' | null
@@ -1701,7 +1583,7 @@ function ResumeGeneratorInner() {
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, [step]);
+  }, []);
 
   // Track preview height so the wrapper sizes correctly for multi-page content
   useEffect(() => {
@@ -1709,13 +1591,13 @@ function ResumeGeneratorInner() {
     const el = previewRef.current;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const h = entry.contentRect.height + 32; // include padding
+        const h = entry.contentRect.height + 32;
         setPreviewHeight(h);
       }
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [step, selectedTemplate, data]);
+  }, [selectedTemplate, data]);
 
   const template = TEMPLATES[selectedTemplate];
 
@@ -1754,33 +1636,8 @@ function ResumeGeneratorInner() {
     }
   };
 
-  const handleParse = async () => {
-    if (!rawText.trim()) return;
-    setStep('parsing');
-    setParseError(null);
-    try {
-      const parsed = await parseResumeWithAPI(rawText);
-      setData(parsed);
-      setStep('edit');
-    } catch (err) {
-      console.error('Parse error:', err);
-      setParseError("We couldn't parse this — paste the structured fields manually.");
-      setData(EMPTY_RESUME);
-      setStep('edit');
-    }
-  };
-
-  const handleSample = () => {
-    setRawText(SAMPLE_RESUME_TEXT);
-    setData(SAMPLE_DATA);
-    setStep('edit');
-  };
-
   const handleStartOver = () => {
     setData(EMPTY_RESUME);
-    setRawText('');
-    setStep('empty');
-    setParseError(null);
   };
 
   const handleExportPDF = () => {
@@ -1807,73 +1664,6 @@ function ResumeGeneratorInner() {
     }
   };
 
-  /* ============== EMPTY STATE ============== */
-  if (step === 'empty') {
-    return (
-      <div className="min-h-screen w-full" style={{ background: '#FAF7F0' }}>
-        <style>{TOOL_FONTS_CSS}</style>
-        <div className="max-w-3xl mx-auto px-6 py-16 md:py-24">
-          <div className="mb-10">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-stone-500 mb-3 tool-body">A resume tool</div>
-            <h1 className="tool-display text-5xl md:text-6xl text-stone-900 leading-[1.05] tracking-tight">
-              Paste your résumé.<br/>
-              <span className="italic text-stone-700">Get something beautiful.</span>
-            </h1>
-            <p className="tool-body text-stone-600 mt-5 max-w-xl leading-relaxed">
-              Drop in your existing résumé as plain text. We'll parse it, render it into one of twelve professionally designed templates, and let you export to PDF or Word — all ATS-friendly, all editable.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-md border border-stone-300/80 shadow-sm overflow-hidden">
-            <textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              placeholder="Paste your résumé here..."
-              className="tool-body w-full px-5 py-4 text-sm text-stone-800 focus:outline-none resize-none"
-              style={{ minHeight: '320px', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}
-            />
-            <div className="border-t border-stone-200 px-4 py-3 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 bg-stone-50/50">
-              <button
-                onClick={handleSample}
-                className="tool-body text-sm text-stone-600 hover:text-stone-900 underline underline-offset-4 decoration-stone-300 hover:decoration-stone-600 transition-colors"
-              >
-                Try with a sample résumé
-              </button>
-              <button
-                onClick={handleParse}
-                disabled={!rawText.trim()}
-                className="tool-body bg-stone-900 hover:bg-stone-700 disabled:bg-stone-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded text-sm font-medium tracking-wide flex items-center gap-2 transition-colors"
-              >
-                <Sparkles className="w-4 h-4" />
-                Parse résumé
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-10 text-xs text-stone-500 tool-body">
-            <span className="uppercase tracking-[0.2em]">12 templates</span>
-            <span className="mx-3">·</span>
-            <span>Corporate · Tech · Creative · Health/Edu · Academic · Trades</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ============== PARSING ============== */
-  if (step === 'parsing') {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: '#FAF7F0' }}>
-        <style>{TOOL_FONTS_CSS}</style>
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-stone-700 animate-spin mx-auto mb-5" />
-          <div className="tool-display text-2xl text-stone-800 italic">Reading your résumé…</div>
-          <div className="tool-body text-sm text-stone-500 mt-2">This usually takes a few seconds.</div>
-        </div>
-      </div>
-    );
-  }
-
   /* ============== EDIT + PREVIEW ============== */
   return (
     <div className="min-h-screen w-full" style={{ background: '#F0EDE3' }}>
@@ -1890,16 +1680,9 @@ function ResumeGeneratorInner() {
           onClick={handleStartOver}
           className="tool-body text-xs text-stone-600 hover:text-stone-900 flex items-center gap-1.5 px-3 py-1.5 rounded hover:bg-stone-100 transition-colors"
         >
-          <RotateCcw className="w-3.5 h-3.5" /> Start over
+          <RotateCcw className="w-3.5 h-3.5" /> Clear form
         </button>
       </header>
-
-      {parseError && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center gap-2 text-sm text-amber-900 tool-body no-print">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {parseError}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] gap-0">
         {/* LEFT: Edit panel */}
@@ -1910,7 +1693,7 @@ function ResumeGeneratorInner() {
               <h2 className="tool-display text-lg text-stone-900">Review &amp; edit</h2>
             </div>
             <p className="tool-body text-xs text-stone-500 mb-5 leading-relaxed">
-              Fix any parsing mistakes before exporting. The preview updates as you type.
+              Fill in your details below. The preview updates as you type.
             </p>
             <ResumeForm data={data} setData={setData} />
           </div>
@@ -2097,8 +1880,7 @@ function ResumeGeneratorInner() {
         </main>
       </div>
 
-      {/* Off-screen full-size resume DOM. We grab .innerHTML at PDF export time and
-          inject it into a new window for native print → "Save as PDF" flow. */}
+      {/* Off-screen full-size resume DOM */}
       <div ref={printAreaRef} className="pdf-print-area" aria-hidden="true">
         <TemplatePreview
           template={template}
