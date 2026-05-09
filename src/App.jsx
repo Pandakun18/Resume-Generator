@@ -1149,236 +1149,207 @@ ${resumeHTML}
   w.document.close();
 }
 
-/* ---------- Word / Google Docs: HTML-as-.doc export ----------
-   Saving an HTML file with a .doc extension is the most universally compatible
-   approach: Microsoft Word, Google Docs, LibreOffice, and Apple Pages all open
-   it correctly. Google Docs in particular imports it with full fidelity —
-   colors, bold, italics, spacing — without needing Word installed.
+/* ---------- Word: generate proper RTF ----------
+   RTF is Word's most boring, most reliable import format. Word, Pages, Google Docs,
+   and LibreOffice all render it the same way. We trade some visual polish (no banner
+   shading, no letter-spacing) for guaranteed-not-empty output and ATS friendliness.
 */
 
-function exportToWord(data, template, accent, accent2, name) {
-  const filename = (name || 'resume').replace(/[^a-z0-9]+/gi, '_').toLowerCase() + '.doc';
-  const esc = (s) => {
-    if (s == null) return '';
-    return String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+// Helpers for RTF generation
+function rtfEscape(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    // Convert non-ASCII to RTF unicode escapes
+    .replace(/[\u0080-\uFFFF]/g, (c) => `\\u${c.charCodeAt(0)}?`)
+    // Tabs and newlines as RTF
+    .replace(/\t/g, '\\tab ')
+    .replace(/\n/g, '\\line ');
+}
+
+function hexToRtfColor(hex) {
+  const h = (hex || '#000000').replace('#', '');
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
   };
+}
 
-  const isBanner = ['banner', 'banner-soft', 'banner-underline'].includes(template.sectionStyle);
-  const isCenter = template.nameAlign === 'center';
-  const isLeft   = template.nameAlign === 'left' || template.nameAlign === 'asymmetric';
+function exportToWord(data, template, accent, accent2, name) {
+  const filename = (name || 'resume').replace(/[^a-z0-9]+/gi, '_').toLowerCase() + '.rtf';
+
+  const accentRGB = hexToRtfColor(accent);
+  const accent2RGB = accent2 ? hexToRtfColor(accent2) : null;
+
+  // Color table: index 0 is auto/default. We define:
+  // 1 = black, 2 = mid-gray, 3 = light gray (banner), 4 = accent, 5 = accent2 (if any)
+  let colorTable = `{\\colortbl;\\red17\\green17\\blue17;\\red60\\green60\\blue60;\\red232\\green232\\blue232;\\red${accentRGB.r}\\green${accentRGB.g}\\blue${accentRGB.b};`;
+  if (accent2RGB) {
+    colorTable += `\\red${accent2RGB.r}\\green${accent2RGB.g}\\blue${accent2RGB.b};`;
+  }
+  colorTable += '}';
+
+  // Font table — pick a reasonable default based on template
   const useSerif = template.bodyFont.includes('Garamond') || template.bodyFont.includes('Cambria') || template.bodyFont.includes('Georgia');
-  const bodyFontStack = useSerif ? 'Garamond, Cambria, Georgia, serif' : 'Calibri, Arial, Helvetica, sans-serif';
-  const nameFontStack = useSerif ? 'Garamond, Cambria, Georgia, serif' : 'Calibri, Arial, Helvetica, sans-serif';
-  const nameUpper = template.nameStyle?.includes('uppercase') || template.nameStyle?.includes('tracked');
-  const bannerBg = template.sectionStyle === 'banner-soft'
-    ? hexToRgba(accent, 0.12)
-    : (isBanner ? '#E8E8E8' : 'transparent');
-  const accent2Color = accent2 || template.accent2 || accent;
+  const fontTable = useSerif
+    ? `{\\fonttbl{\\f0\\froman\\fcharset0 Garamond;}{\\f1\\fswiss\\fcharset0 Arial;}}`
+    : `{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}{\\f1\\froman\\fcharset0 Garamond;}}`;
 
-  const lines = [];
+  const out = [];
 
-  lines.push(`
-<html xmlns:o='urn:schemas-microsoft-com:office:office'
-      xmlns:w='urn:schemas-microsoft-com:office:word'
-      xmlns='http://www.w3.org/TR/REC-html40'>
-<head>
-<meta charset="utf-8">
-<title>${esc(data.name || 'Resume')}</title>
-<!--[if gte mso 9]>
-<xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
-<![endif]-->
-<style>
-  @page { size: 8.5in 11in; margin: 0.75in; }
-  body {
-    font-family: ${bodyFontStack};
-    font-size: 10.5pt;
-    color: #1c1c1c;
-    line-height: 1.5;
-    margin: 0;
-    padding: 0;
-  }
-  h1.resume-name {
-    font-family: ${nameFontStack};
-    font-size: ${nameUpper ? '22pt' : '26pt'};
-    font-weight: ${template.nameStyle?.includes('bold') ? '700' : '500'};
-    letter-spacing: ${nameUpper ? '0.18em' : '0.01em'};
-    text-transform: ${nameUpper ? 'uppercase' : 'none'};
-    text-align: ${isCenter ? 'center' : 'left'};
-    margin: 0 0 4pt 0;
-    color: #111;
-  }
-  .contact-line {
-    font-size: 9.5pt;
-    color: #3a3a3a;
-    text-align: ${isCenter ? 'center' : 'left'};
-    margin: 0 0 14pt 0;
-  }
-  .name-rule {
-    width: 1.4in;
-    height: 1.5px;
-    background: ${accent};
-    margin: 4pt 0 10pt 0;
-    border: none;
-  }
-  .section-header {
-    font-size: 9.5pt;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: ${accent};
-    margin: 18pt 0 8pt 0;
-    padding: ${isBanner ? '4pt 10pt' : '0 0 3pt 0'};
-    background: ${bannerBg};
-    text-align: ${isBanner ? 'center' : 'left'};
-    border-bottom: ${!isBanner ? `1px solid ${accent}` : template.sectionStyle === 'banner-underline' ? `1.5px solid ${accent2Color}` : 'none'};
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    font-style: ${template.sectionStyle === 'small-caps-italic' ? 'italic' : 'normal'};
-  }
-  .job-header {
-    display: table;
-    width: 100%;
-    margin: 0 0 3pt 0;
-  }
-  .job-title-col { display: table-cell; font-weight: 700; color: #111; }
-  .job-date-col  { display: table-cell; text-align: right; white-space: nowrap; color: #3a3a3a; font-size: 10pt; width: 2in; }
-  .job-summary   { color: #2b2b2b; margin: 2pt 0; font-style: ${template.italicRoles ? 'italic' : 'normal'}; }
-  ul.resume-bullets {
-    margin: 3pt 0 10pt 0;
-    padding-left: 18pt;
-  }
-  ul.resume-bullets li { margin-bottom: 2pt; }
-  .skills-line { margin: 4pt 0 10pt 0; color: #1c1c1c; }
-  .tagline { font-style: italic; color: #2b2b2b; margin: 4pt 0; }
-  .honors { font-style: italic; color: #3a3a3a; font-size: 10pt; margin: 2pt 0 6pt 0; }
-  .cert-item { margin-bottom: 3pt; }
-  .spacer { height: 6pt; }
-</style>
-</head>
-<body>`);
+  // Document header
+  out.push(`{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat`);
+  out.push(fontTable);
+  out.push(colorTable);
+  // Letter size: 8.5 x 11 inches in twips (1 inch = 1440 twips)
+  out.push(`\\paperw12240\\paperh15840\\margl1080\\margr1080\\margt1080\\margb1080`);
+  out.push(`\\f0\\fs22\\cf1`); // default font, size 11pt, color black
 
-  // ---- Name ----
-  lines.push(`<h1 class="resume-name">${esc(nameUpper ? (data.name || '').toUpperCase() : (data.name || ''))}</h1>`);
-
-  // Name rule decoration (left-aligned templates)
-  if (isLeft && (template.decorativeMark === 'name-rule' || template.decorativeMark === 'name-rule-orange')) {
-    lines.push(`<hr class="name-rule" style="background:${template.decorativeMark === 'name-rule-orange' ? accent2Color : accent}">`);
+  // ---------- Header: Name ----------
+  if (data.name) {
+    const align = template.nameAlign === 'left' || template.nameAlign === 'asymmetric' ? '\\ql' : '\\qc';
+    const nameUpper = template.nameStyle?.includes('uppercase') || template.nameStyle?.includes('tracked');
+    const nameSize = nameUpper ? 48 : 56; // half-points: 24pt or 28pt
+    const nameText = nameUpper ? data.name.toUpperCase() : data.name;
+    out.push(`{\\pard${align}\\sb0\\sa120\\fs${nameSize}\\b\\cf1 ${rtfEscape(nameText)}\\par}`);
   }
 
-  // ---- Contact ----
+  // ---------- Header: Contact line ----------
   const contactItems = [
-    data.contact.location, data.contact.phone, data.contact.email,
-    data.contact.linkedin, data.contact.website,
+    data.contact.location,
+    data.contact.phone,
+    data.contact.email,
+    data.contact.linkedin,
+    data.contact.website,
   ].filter(Boolean);
   if (contactItems.length) {
-    lines.push(`<div class="contact-line">${esc(contactItems.join('  |  '))}</div>`);
+    const align = template.nameAlign === 'left' || template.nameAlign === 'asymmetric' ? '\\ql' : '\\qc';
+    out.push(`{\\pard${align}\\sb0\\sa240\\fs19\\cf2 ${rtfEscape(contactItems.join('  |  '))}\\par}`);
   }
 
-  // ---- Section helper ----
-  const secHeader = (title) => {
-    lines.push(`<div class="section-header">${esc(title.toUpperCase())}</div>`);
+  // ---------- Section header helper ----------
+  // Banner-style: shaded paragraph in light gray, centered uppercase, accent text color
+  const sectionHeader = (text) => {
+    const isBanner = ['banner', 'banner-soft', 'banner-underline'].includes(template.sectionStyle);
+    if (isBanner) {
+      // Shaded paragraph using cbpat (paragraph background pattern color = light gray index 3)
+      // Text color is accent (index 4)
+      out.push(`{\\pard\\qc\\sb240\\sa120\\cbpat3\\cf4\\fs20\\b ${rtfEscape(text.toUpperCase())}\\b0\\par}`);
+    } else {
+      // Rule style: text in accent, with horizontal rule below
+      out.push(`{\\pard\\ql\\sb240\\sa60\\cf4\\fs19\\b ${rtfEscape(text.toUpperCase())}\\b0\\par}`);
+      out.push(`{\\pard\\ql\\sb0\\sa120\\brdrb\\brdrs\\brdrw10\\brdrcf4\\par}`); // horizontal line below
+    }
   };
 
-  // ---- Certifications (if licensesProminent) ----
-  if (template.licensesProminent && data.certifications?.length) {
-    secHeader('Certifications & Licenses');
-    lines.push(`<ul class="resume-bullets">`);
-    data.certifications.forEach(c => {
-      lines.push(`<li class="cert-item"><strong>${esc(c.name)}</strong>${c.org ? ', ' + esc(c.org) : ''}${c.date ? ' (' + esc(c.date) + ')' : ''}</li>`);
-    });
-    lines.push(`</ul>`);
-  }
-
-  // ---- Summary ----
+  // ---------- Summary ----------
   const s = data.summary || {};
-  const hasSummary = s.tagline || (s.bullets?.length) || (s.skills?.length);
+  const hasSummary = s.tagline || (s.bullets && s.bullets.length) || (s.skills && s.skills.length);
   if (hasSummary) {
-    secHeader('Summary');
-    if (s.bullets?.length) {
-      lines.push(`<ul class="resume-bullets">`);
-      s.bullets.forEach(b => lines.push(`<li>${esc(b)}</li>`));
-      lines.push(`</ul>`);
+    sectionHeader('Summary');
+    if (s.bullets && s.bullets.length) {
+      s.bullets.forEach((b) => {
+        out.push(`{\\pard\\fi-280\\li360\\sa60\\cf1\\fs22 \\u8226? \\tab ${rtfEscape(b)}\\par}`);
+      });
     }
-    if (s.tagline) lines.push(`<div class="tagline">${esc(s.tagline)}</div>`);
-    if (s.skills?.length) {
-      lines.push(`<div class="skills-line">${esc(s.skills.join('  \u2013  '))}</div>`);
+    if (s.tagline) {
+      out.push(`{\\pard\\ql\\sa60\\cf1\\fs22\\i ${rtfEscape(s.tagline)}\\i0\\par}`);
+    }
+    if (s.skills && s.skills.length) {
+      out.push(`{\\pard\\ql\\sa120\\cf1\\fs22 ${rtfEscape(s.skills.join('  -  '))}\\par}`);
     }
   }
 
-  // ---- Experience ----
-  if (data.experience?.length) {
-    secHeader('Experience');
-    data.experience.forEach(exp => {
-      const dateRange = [exp.start, exp.end].filter(Boolean).join(' \u2014 ');
-      lines.push(`<div class="job-header">
-  <span class="job-title-col">
-    <strong>${esc(exp.title)}</strong>${exp.company ? ' \u2014 ' + esc(exp.company) : ''}${exp.location ? ', ' + esc(exp.location) : ''}
-  </span>
-  <span class="job-date-col">${esc(dateRange)}</span>
-</div>`);
-      if (exp.summary) lines.push(`<div class="job-summary">${esc(exp.summary)}</div>`);
-      if (exp.bullets?.length) {
-        lines.push(`<ul class="resume-bullets">`);
-        exp.bullets.forEach(b => lines.push(`<li>${esc(b)}</li>`));
-        lines.push(`</ul>`);
+  // ---------- Experience ----------
+  if (data.experience && data.experience.length) {
+    sectionHeader('Experience');
+    data.experience.forEach((exp) => {
+      // Title line — bold title, then company, then date pushed to right via tab
+      const titleLine = [
+        exp.title ? `{\\b ${rtfEscape(exp.title)}\\b0}` : '',
+        exp.company ? ` \\u8212? ${rtfEscape(exp.company)}` : '',
+        exp.location ? `, ${rtfEscape(exp.location)}` : '',
+      ].join('');
+      const dateRange = [exp.start, exp.end].filter(Boolean).join(' \\u8212? ');
+      // \tx9000 sets a tab stop at ~6.25 inches (right side of content area)
+      // Use \tqr for right-aligned tab
+      out.push(`{\\pard\\ql\\sb120\\sa40\\tx9000\\tqr\\tx9000\\cf1\\fs22 ${titleLine}\\tab ${rtfEscape(dateRange)}\\par}`);
+      if (exp.summary) {
+        const italic = template.italicRoles ? '\\i' : '';
+        const italicEnd = template.italicRoles ? '\\i0' : '';
+        out.push(`{\\pard\\ql\\sa40\\cf1\\fs22 ${italic}${rtfEscape(exp.summary)}${italicEnd}\\par}`);
       }
-      lines.push(`<div class="spacer"></div>`);
+      if (exp.bullets && exp.bullets.length) {
+        exp.bullets.forEach((b) => {
+          out.push(`{\\pard\\fi-280\\li360\\sa30\\cf1\\fs22 \\u8226? \\tab ${rtfEscape(b)}\\par}`);
+        });
+      }
+      out.push(`{\\pard\\sb60\\par}`); // spacer
     });
   }
 
-  // ---- Education ----
-  if (data.education?.length) {
-    secHeader('Education');
-    data.education.forEach(ed => {
-      lines.push(`<div class="job-header">
-  <span class="job-title-col">
-    <strong>${esc(ed.degree)}</strong>${ed.school ? ' \u2014 ' + esc(ed.school) : ''}${ed.location ? ', ' + esc(ed.location) : ''}
-  </span>
-  <span class="job-date-col">${esc(ed.date || '')}</span>
-</div>`);
-      if (ed.honors) lines.push(`<div class="honors">${esc(ed.honors)}</div>`);
-    });
-  }
-
-  // ---- Certifications (standard position) ----
-  if (!template.licensesProminent && data.certifications?.length) {
-    secHeader('Certifications & Licenses');
-    lines.push(`<ul class="resume-bullets">`);
-    data.certifications.forEach(c => {
-      lines.push(`<li class="cert-item"><strong>${esc(c.name)}</strong>${c.org ? ', ' + esc(c.org) : ''}${c.date ? ' (' + esc(c.date) + ')' : ''}</li>`);
-    });
-    lines.push(`</ul>`);
-  }
-
-  // ---- Projects ----
-  if (data.projects?.length) {
-    secHeader('Projects');
-    data.projects.forEach(p => {
-      if (p.name) lines.push(`<div><strong>${esc(p.name)}</strong></div>`);
-      if (p.description) lines.push(`<div class="job-summary">${esc(p.description)}</div>`);
-      if (p.bullets?.length) {
-        lines.push(`<ul class="resume-bullets">`);
-        p.bullets.forEach(b => lines.push(`<li>${esc(b)}</li>`));
-        lines.push(`</ul>`);
+  // ---------- Education ----------
+  if (data.education && data.education.length) {
+    sectionHeader('Education');
+    data.education.forEach((ed) => {
+      const line = [
+        ed.degree ? `{\\b ${rtfEscape(ed.degree)}\\b0}` : '',
+        ed.school ? ` \\u8212? ${rtfEscape(ed.school)}` : '',
+        ed.location ? `, ${rtfEscape(ed.location)}` : '',
+      ].join('');
+      out.push(`{\\pard\\ql\\sb80\\sa40\\tx9000\\tqr\\tx9000\\cf1\\fs22 ${line}\\tab ${rtfEscape(ed.date || '')}\\par}`);
+      if (ed.honors) {
+        out.push(`{\\pard\\ql\\sa40\\cf2\\fs21\\i ${rtfEscape(ed.honors)}\\i0\\par}`);
       }
     });
   }
 
-  // ---- Awards ----
-  if (data.awards?.length) {
-    secHeader('Awards & Honors');
-    lines.push(`<ul class="resume-bullets">`);
-    data.awards.forEach(a => lines.push(`<li>${esc(a)}</li>`));
-    lines.push(`</ul>`);
+  // ---------- Certifications ----------
+  if (data.certifications && data.certifications.length) {
+    sectionHeader('Certifications & Licenses');
+    data.certifications.forEach((c) => {
+      const parts = [
+        c.name ? `{\\b ${rtfEscape(c.name)}\\b0}` : '',
+        c.org ? `, ${rtfEscape(c.org)}` : '',
+        c.date ? ` (${rtfEscape(c.date)})` : '',
+      ].join('');
+      out.push(`{\\pard\\fi-280\\li360\\sa40\\cf1\\fs22 \\u8226? \\tab ${parts}\\par}`);
+    });
   }
 
-  lines.push(`</body></html>`);
+  // ---------- Projects ----------
+  if (data.projects && data.projects.length) {
+    sectionHeader('Projects');
+    data.projects.forEach((p) => {
+      if (p.name) {
+        out.push(`{\\pard\\ql\\sb80\\sa40\\cf1\\fs22\\b ${rtfEscape(p.name)}\\b0\\par}`);
+      }
+      if (p.description) {
+        out.push(`{\\pard\\ql\\sa40\\cf1\\fs22 ${rtfEscape(p.description)}\\par}`);
+      }
+      if (p.bullets && p.bullets.length) {
+        p.bullets.forEach((b) => {
+          out.push(`{\\pard\\fi-280\\li360\\sa30\\cf1\\fs22 \\u8226? \\tab ${rtfEscape(b)}\\par}`);
+        });
+      }
+    });
+  }
 
-  const html = lines.join('\n');
-  const blob = new Blob([html], { type: 'application/msword;charset=utf-8' });
+  // ---------- Awards ----------
+  if (data.awards && data.awards.length) {
+    sectionHeader('Awards & Honors');
+    data.awards.forEach((a) => {
+      out.push(`{\\pard\\fi-280\\li360\\sa40\\cf1\\fs22 \\u8226? \\tab ${rtfEscape(a)}\\par}`);
+    });
+  }
+
+  out.push(`}`);
+
+  const rtf = out.join('\n');
+  const blob = new Blob([rtf], { type: 'application/rtf' });
   downloadBlob(blob, filename);
 }
 
@@ -1534,7 +1505,174 @@ const TOOL_FONTS_CSS = `
   .preview-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
 `;
 
-export default function ResumeGenerator() {
+/* ============================================================
+   PASSWORD GATE
+   ============================================================ */
+
+const SITE_PASSWORD = 'resume2026';
+
+function PasswordGate({ children }) {
+  const [unlocked, setUnlocked] = React.useState(false);
+  const [input, setInput] = React.useState('');
+  const [error, setError] = React.useState(false);
+  const [shake, setShake] = React.useState(false);
+
+  const handleUnlock = () => {
+    if (input === SITE_PASSWORD) {
+      setUnlocked(true);
+    } else {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      setTimeout(() => setError(false), 2000);
+      setInput('');
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter') handleUnlock();
+  };
+
+  if (unlocked) return children;
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#FAF7F0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      padding: '1.5rem',
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap');
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-6px); }
+          80% { transform: translateX(6px); }
+        }
+        .gate-shake { animation: shake 0.45s ease; }
+        .gate-input:focus { outline: none; border-color: #1c1917 !important; box-shadow: 0 0 0 1px #1c1917; }
+        .gate-btn:hover { background: #44403c !important; }
+      `}</style>
+
+      <div style={{
+        background: '#fff',
+        border: '1px solid #e7e5e4',
+        borderRadius: '0.5rem',
+        padding: '2.5rem 2rem',
+        width: '100%',
+        maxWidth: '22rem',
+        boxShadow: '0 4px 24px -4px rgba(0,0,0,0.08)',
+        textAlign: 'center',
+      }}>
+        {/* Logo / title */}
+        <div style={{
+          fontFamily: '"EB Garamond", Garamond, serif',
+          fontSize: '2rem',
+          fontWeight: 400,
+          fontStyle: 'italic',
+          color: '#1c1917',
+          marginBottom: '0.25rem',
+          letterSpacing: '0.01em',
+        }}>
+          Résumé
+        </div>
+        <div style={{
+          fontSize: '0.7rem',
+          letterSpacing: '0.25em',
+          textTransform: 'uppercase',
+          color: '#a8a29e',
+          marginBottom: '2rem',
+        }}>
+          Builder
+        </div>
+
+        <p style={{
+          fontSize: '0.875rem',
+          color: '#57534e',
+          marginBottom: '1.5rem',
+          lineHeight: 1.6,
+        }}>
+          Enter your access password to continue.
+        </p>
+
+        {/* Input */}
+        <div className={shake ? 'gate-shake' : ''} style={{ marginBottom: '0.75rem' }}>
+          <input
+            className="gate-input"
+            type="password"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Password"
+            autoFocus
+            style={{
+              width: '100%',
+              padding: '0.625rem 0.875rem',
+              fontSize: '0.875rem',
+              border: error ? '1px solid #dc2626' : '1px solid #d6d3d1',
+              borderRadius: '0.25rem',
+              background: error ? '#fef2f2' : '#fff',
+              color: '#1c1c1c',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+              transition: 'border-color 150ms',
+            }}
+          />
+        </div>
+
+        {/* Error message */}
+        <div style={{
+          fontSize: '0.8rem',
+          color: '#dc2626',
+          marginBottom: '1rem',
+          minHeight: '1.2rem',
+          transition: 'opacity 150ms',
+          opacity: error ? 1 : 0,
+        }}>
+          Incorrect password — please try again.
+        </div>
+
+        {/* Button */}
+        <button
+          className="gate-btn"
+          onClick={handleUnlock}
+          style={{
+            width: '100%',
+            padding: '0.625rem 1rem',
+            background: '#1c1917',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '0.25rem',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            letterSpacing: '0.02em',
+            transition: 'background 150ms',
+          }}
+        >
+          Enter
+        </button>
+
+        <p style={{
+          fontSize: '0.72rem',
+          color: '#a8a29e',
+          marginTop: '1.5rem',
+          lineHeight: 1.5,
+        }}>
+          Password included in your purchase receipt.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ResumeGeneratorInner() {
   const [step, setStep] = useState('empty'); // 'empty' | 'parsing' | 'edit'
   const [rawText, setRawText] = useState('');
   const [data, setData] = useState(EMPTY_RESUME);
@@ -1944,7 +2082,7 @@ export default function ResumeGenerator() {
                 className="tool-body bg-white border border-stone-900 text-stone-900 hover:bg-stone-100 disabled:opacity-50 px-4 py-2.5 rounded text-sm font-medium flex items-center gap-2 transition-colors"
               >
                 {isExporting === 'docx' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                Word / Google Docs
+                Download Word
               </button>
               <button
                 onClick={handleExportPDF}
@@ -1970,6 +2108,13 @@ export default function ResumeGenerator() {
         />
       </div>
     </div>
- );
+  );
 }
 
+export default function ResumeGenerator() {
+  return (
+    <PasswordGate>
+      <ResumeGeneratorInner />
+    </PasswordGate>
+  );
+}
